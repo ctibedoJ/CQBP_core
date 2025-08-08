@@ -1,0 +1,226 @@
+""" Core module for the Classical Quantum Biophysics (CQBP) framework.
+This module provides the fundamental classes and abstractions for representing fields, operators, and systems in the CQBP framework. """
+import numpy as np 
+from typing import Dict, List, Tuple, Union, Optional, Callable 
+from abc import ABC, abstractmethod import scipy.sparse as sp
+class Field(ABC): """ Abstract base class for all field representations in CQBP.
+Fields are the fundamental objects in CQBP, representing spatial distributions
+of physical quantities such as electron density, electrostatic potential,
+and other molecular properties.
+"""
+
+def __init__(self, name: str = ""):
+    """
+    Initialize a Field object.
+    
+    Parameters
+    ----------
+    name : str, optional
+        Name of the field
+    """
+    self.name = name
+    
+@abstractmethod
+def evaluate(self, points: np.ndarray) -> np.ndarray:
+    """
+    Evaluate the field at specified points in space.
+    
+    Parameters
+    ----------
+    points : np.ndarray
+        Array of shape (n, 3) containing the coordinates at which to evaluate the field
+        
+    Returns
+    -------
+    np.ndarray
+        Field values at the specified points
+    """
+    pass
+
+def __add__(self, other):
+    """Addition operator for fields."""
+    if not isinstance(other, Field):
+        raise TypeError(f"Cannot add Field and {type(other)}")
+    return CompositeField([self, other], [1.0, 1.0])
+
+def __mul__(self, scalar):
+    """Scalar multiplication operator for fields."""
+    if not isinstance(scalar, (int, float, complex)):
+        raise TypeError(f"Cannot multiply Field by {type(scalar)}")
+    return ScaledField(self, scalar)
+class ScaledField(Field): """A field scaled by a constant factor."""
+def __init__(self, field: Field, scale_factor: float):
+    """
+    Initialize a ScaledField.
+    
+    Parameters
+    ----------
+    field : Field
+        The field to scale
+    scale_factor : float
+        The scaling factor
+    """
+    super().__init__(f"{scale_factor}*{field.name}")
+    self.field = field
+    self.scale_factor = scale_factor
+    
+def evaluate(self, points: np.ndarray) -> np.ndarray:
+    """
+    Evaluate the scaled field at specified points.
+    
+    Parameters
+    ----------
+    points : np.ndarray
+        Array of shape (n, 3) containing the coordinates
+        
+    Returns
+    -------
+    np.ndarray
+        Scaled field values at the specified points
+    """
+    return self.scale_factor * self.field.evaluate(points)
+class CompositeField(Field): """A linear combination of fields."""
+def __init__(self, fields: List[Field], coefficients: List[float]):
+    """
+    Initialize a CompositeField.
+    
+    Parameters
+    ----------
+    fields : List[Field]
+        List of component fields
+    coefficients : List[float]
+        Coefficients for each field
+    """
+    if len(fields) != len(coefficients):
+        raise ValueError("Number of fields must match number of coefficients")
+    
+    name = " + ".join([f"{c}*{f.name}" for f, c in zip(fields, coefficients)])
+    super().__init__(name)
+    self.fields = fields
+    self.coefficients = coefficients
+    
+def evaluate(self, points: np.ndarray) -> np.ndarray:
+    """
+    Evaluate the composite field at specified points.
+    
+    Parameters
+    ----------
+    points : np.ndarray
+        Array of shape (n, 3) containing the coordinates
+        
+    Returns
+    -------
+    np.ndarray
+        Combined field values at the specified points
+    """
+    result = np.zeros(len(points))
+    for field, coef in zip(self.fields, self.coefficients):
+        result += coef * field.evaluate(points)
+    return result
+class Operator(ABC): """ Abstract base class for operators in CQBP.
+Operators transform fields or act on quantum states.
+"""
+
+def __init__(self, name: str = ""):
+    """
+    Initialize an Operator object.
+    
+    Parameters
+    ----------
+    name : str, optional
+        Name of the operator
+    """
+    self.name = name
+
+@abstractmethod
+def apply(self, obj):
+    """
+    Apply the operator to an object (field, state, etc.).
+    
+    Parameters
+    ----------
+    obj : object
+        The object to which the operator is applied
+        
+    Returns
+    -------
+    object
+        The result of applying the operator
+    """
+    pass
+class System(ABC): """ Abstract base class for physical systems in CQBP.
+Systems represent collections of interacting components, such as
+molecules, proteins, or quantum subsystems.
+"""
+
+def __init__(self, name: str = ""):
+    """
+    Initialize a System object.
+    
+    Parameters
+    ----------
+    name : str, optional
+        Name of the system
+    """
+    self.name = name
+    self.components = {}
+    self.fields = {}
+    self.operators = {}
+
+def add_component(self, name: str, component) -> None:
+    """
+    Add a component to the system.
+    
+    Parameters
+    ----------
+    name : str
+        Name of the component
+    component : object
+        The component to add
+    """
+    self.components[name] = component
+
+def add_field(self, name: str, field: Field) -> None:
+    """
+    Add a field to the system.
+    
+    Parameters
+    ----------
+    name : str
+        Name of the field
+    field : Field
+        The field to add
+    """
+    self.fields[name] = field
+
+def add_operator(self, name: str, operator: Operator) -> None:
+    """
+    Add an operator to the system.
+    
+    Parameters
+    ----------
+    name : str
+        Name of the operator
+    operator : Operator
+        The operator to add
+    """
+    self.operators[name] = operator
+
+@abstractmethod
+def evolve(self, time_step: float, steps: int = 1):
+    """
+    Evolve the system in time.
+    
+    Parameters
+    ----------
+    time_step : float
+        Time step for evolution
+    steps : int, optional
+        Number of steps to evolve
+        
+    Returns
+    -------
+    System
+        The evolved system
+    """
+    pass
